@@ -1,6 +1,6 @@
 # Flight Deal Tracker
 
-Tracks Google Flights prices through SerpApi, stores observed price history in SQLite, and sends alerts through a Telegram bot. A Streamlit dashboard shows routes, trends and alert history. The included GitHub Actions workflow polls the bot hourly and commits SQLite history and bot-added routes to the repository so they survive temporary runners. Sends Telegram app notifications, not carrier SMS.
+Tracks Google Flights prices through SerpApi, stores observed price history in SQLite, and sends alerts through a Telegram bot. A Streamlit dashboard shows routes, trends and alert history. The included GitHub Actions workflow polls the bot every five minutes and commits SQLite history and bot-added routes to the repository so they survive temporary runners. Sends Telegram app notifications, not carrier SMS.
 
 ## Local setup
 
@@ -37,7 +37,7 @@ An alert qualifies when the current cheapest fare for a date pair meets an optio
 
 ## Telegram route commands
 
-Send commands in the private chat with your configured bot. The hourly workflow reads them on its next run:
+Send commands in the private chat with your configured bot. The workflow reads them on its next five-minute run:
 
 ```text
 /add holiday SFO JFK 2026-12-19 2026-12-27
@@ -53,4 +53,4 @@ Send commands in the private chat with your configured bot. The hourly workflow 
 
 ## Scheduled free use
 
-The workflow runs at minute 17 of every UTC hour. Automatic searches are paced to at most six SerpApi requests per UTC day, and all searches obey the 200-request monthly app cap. Several routes share that allowance. Round trips need at least two requests each, so they will be checked less often than one-way routes; hourly bot polling does not mean hourly price searches. `/check` requests use available monthly credits on the next workflow run. The workflow uses one outbound option per round trip to conserve credits. A public repository can run on standard GitHub-hosted runners without private-repository Actions minute charges, but all committed routes and history are public.
+The workflow polls at minutes 2, 7, 12, and so on, through 57 of every UTC hour. GitHub may delay scheduled runs, so this is not instant messaging. Automatic searches are paced to at most six SerpApi requests per UTC day, and all searches obey the 200-request monthly app cap. Several routes share that allowance. Round trips need at least two requests each, so they will be checked less often than one-way routes; frequent bot polling does not mean frequent price searches. `/check` requests use available monthly credits on the next workflow run. The workflow uses one outbound option per round trip to conserve credits. A public repository can run on standard GitHub-hosted runners without private-repository Actions minute charges, but all committed routes and history are public.

@@ -1,0 +1,4 @@
+requests>=2.31,<3
+PyYAML>=6,<7
+python-dotenv>=1,<2
+SQLAlchemy>=2,<3
