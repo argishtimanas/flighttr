@@ -14,21 +14,33 @@ def format_alert(fare, reasons, metrics):
     return text + "\nSearch: " + (fare.booking_link or fare.search_link)
 
 
-def send_alert(body, session=None):
-    """Send a free Telegram bot message to the configured chat."""
+def send_message(body, chat_id, session=None):
+    """Send a Telegram message to an explicit chat without logging credentials."""
     token = os.environ["TELEGRAM_BOT_TOKEN"]
-    chat_id = os.environ["TELEGRAM_CHAT_ID"]
     try:
         response = (session or requests).post(
             f"https://api.telegram.org/bot{token}/sendMessage",
             data={"chat_id": chat_id, "text": body}, timeout=15)
         response.raise_for_status()
-    except requests.RequestException as exc:
+    except requests.RequestException:
         raise RuntimeError("Telegram message request failed") from None
     result = response.json()
     if not result.get("ok"):
         raise RuntimeError("Telegram rejected the alert")
     return str(result["result"]["message_id"])
+
+
+def send_alert(body, session=None):
+    """Send an owner-only message, such as a command reply or test alert."""
+    return send_message(body, os.environ["TELEGRAM_CHAT_ID"], session=session)
+
+
+def send_channel_alert(body, session=None):
+    """Post a deal to the private channel configured in Actions secrets."""
+    channel_id = os.getenv("TELEGRAM_DEALS_CHANNEL_ID")
+    if not channel_id:
+        raise RuntimeError("TELEGRAM_DEALS_CHANNEL_ID is not configured")
+    return send_message(body, channel_id, session=session)
 
 
 def telegram_chat_ids(session=None):

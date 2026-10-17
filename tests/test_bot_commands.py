@@ -24,6 +24,14 @@ def test_add_list_remove_routes_without_target(tmp_path):
     assert load_routes(path) == []
 
 
+def test_private_channel_link_is_owner_setup_only(tmp_path):
+    path = tmp_path / "routes.yaml"
+    path.write_text(yaml.safe_dump({"routes": []}))
+    reply, requested = handle_command("/channel-id https://t.me/c/1234567890/42", path)
+    assert "-1001234567890" in reply and requested == []
+    assert "Send a private channel post link" in handle_command("/channel-id https://example.com/c/123/42", path)[0]
+
+
 def test_only_configured_chat_can_change_routes(tmp_path, monkeypatch):
     path = tmp_path / "routes.yaml"
     path.write_text(yaml.safe_dump({"routes": []}))
@@ -39,6 +47,28 @@ def test_only_configured_chat_can_change_routes(tmp_path, monkeypatch):
     assert [r.id for r in load_routes(path)] == ["trip"]
     assert store.bot_offset() == 6
     sent.assert_called_once()
+
+
+def test_guest_gets_only_channel_directions(tmp_path, monkeypatch):
+    path = tmp_path / "routes.yaml"
+    path.write_text(yaml.safe_dump({"routes": []}))
+    store = Store(f"sqlite:///{tmp_path / 'state.db'}")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "123")
+    updates = [
+        {"update_id": 1, "message": {"chat": {"id": 456, "type": "private"}, "text": "/start"}},
+        {"update_id": 2, "message": {"chat": {"id": 456, "type": "private"}, "text": "/add evil SFO JFK 2027-02-12"}},
+        {"update_id": 3, "message": {"chat": {"id": 123, "type": "private"},
+                                     "forward_origin": {"chat": {"id": -1001234567890, "type": "channel"}}}},
+    ]
+    monkeypatch.setattr("app.bot_commands.telegram_updates", lambda offset, session=None: updates)
+    owner = Mock()
+    guest = Mock()
+    assert process_updates(store, path, send=owner, send_guest=guest) == []
+    assert load_routes(path) == []
+    assert store.bot_offset() == 4
+    guest.assert_called_once()
+    assert guest.call_args.args[1] == 456
+    assert "-1001234567890" in owner.call_args.args[0]
 
 
 def test_hourly_job_waits_when_daily_pace_used(monkeypatch):

@@ -7,7 +7,7 @@ from app.config import route_from_dict
 from app.database import Store
 from app.deal_detector import detect, percent_drop, should_notify
 from app.flight_api import FlightClient, FlightAPIError, normalize_results, search_params
-from app.notifications import send_alert, telegram_chat_ids
+from app.notifications import send_alert, send_channel_alert, telegram_chat_ids
 
 
 def route(**changes):
@@ -116,6 +116,9 @@ def test_telegram_mock(monkeypatch):
     assert session.post.call_args.kwargs["data"]["chat_id"] == "12345"
     session.get.return_value.json.return_value = {"ok": True, "result": [{"message": {"chat": {"id": 12345}}}]}
     assert telegram_chat_ids(session=session) == ["12345"]
+    monkeypatch.setenv("TELEGRAM_DEALS_CHANNEL_ID", "-1001234567890")
+    assert send_channel_alert("deal", session=session) == "777"
+    assert session.post.call_args.kwargs["data"]["chat_id"] == "-1001234567890"
 
 
 def test_complete_check_with_mocked_services(tmp_path, monkeypatch):
@@ -126,15 +129,20 @@ def test_complete_check_with_mocked_services(tmp_path, monkeypatch):
     fare = normalize_results(payload(), r, date(2027, 2, 12), None)[0]
     client.search.return_value = [fare]
     sent = Mock(return_value="SMfake")
+    channel = Mock(return_value="CHfake")
     monkeypatch.setattr("app.main.send_alert", sent)
+    monkeypatch.setattr("app.main.send_channel_alert", channel)
+    monkeypatch.setenv("TELEGRAM_DEALS_CHANNEL_ID", "-1001234567890")
     monkeypatch.chdir(tmp_path)
     result = check(routes=[r], store=store, client=client)
     assert result[0]["cheapest"] == 218
     assert store.usage_today() == 0  # mock client made no real API call
     assert store.alert_count_today() == 1
     assert sent.call_count == 1
+    assert channel.call_count == 1
     check(routes=[r], store=store, client=client)
     assert sent.call_count == 1  # same itinerary and price is deduplicated
+    assert channel.call_count == 1
 
 
 def test_roundtrip_uses_departure_token():

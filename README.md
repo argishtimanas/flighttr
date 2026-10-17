@@ -51,6 +51,12 @@ Send commands in the private chat with your configured bot. The workflow reads t
 
 `/add` creates an exact-date route with no target price and requests a check if credits remain. A date with no return is one-way. The bot accepts commands only from `TELEGRAM_CHAT_ID`. The existing route and optional filters can still be edited in the dashboard or YAML file. On a public GitHub repository, the route file and committed SQLite history reveal your travel routes and dates to anyone. Bot tokens and the chat ID remain Actions secrets.
 
+## Share deals with friends
+
+Create a **private Telegram channel** for deal alerts and invite your friends to that channel. Add your bot as a channel administrator with permission to post messages. Channel subscribers can read deals but cannot run route commands; those remain restricted to your `TELEGRAM_CHAT_ID`. If a friend opens the bot directly and sends `/start`, it will tell them to ask you for a channel invite. It will ignore their other commands.
+
+To find the private channel ID, post a message in the channel, copy its message link, and send `/channel-id <link>` to your bot. You can also forward that channel post to the bot. It replies privately with the ID. Add that ID as the repository **Actions secret** `TELEGRAM_DEALS_CHANNEL_ID`; optionally add the same key to your local `.env`. Never place the channel ID or invite link in the public route file. Run `python -m app.main test-channel` locally after setting the `.env` value, or run the GitHub workflow after setting the Actions secret and wait for the next qualifying deal. The channel gets deal alerts only; your command replies and manual check summaries stay in your private bot chat.
+
 ## Scheduled free use
 
 The workflow polls at minutes 2, 7, 12, and so on, through 57 of every UTC hour. GitHub may delay scheduled runs, so this is not instant messaging. Automatic searches are paced to at most six SerpApi requests per UTC day, and all searches obey the 200-request monthly app cap. Several routes share that allowance. Round trips need at least two requests each, so they will be checked less often than one-way routes; frequent bot polling does not mean frequent price searches. `/check` requests use available monthly credits on the next workflow run. The workflow uses one outbound option per round trip to conserve credits. A public repository can run on standard GitHub-hosted runners without private-repository Actions minute charges, but all committed routes and history are public.

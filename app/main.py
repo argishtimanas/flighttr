@@ -16,7 +16,7 @@ from app.config import load_routes, positive_env
 from app.database import Store
 from app.deal_detector import detect, should_notify
 from app.flight_api import FlightClient, FlightAPIError, normalize_results
-from app.notifications import format_alert, send_alert, telegram_chat_ids
+from app.notifications import format_alert, send_alert, send_channel_alert, telegram_chat_ids
 from app.bot_commands import process_updates
 
 logging.basicConfig(level=logging.INFO, format='%(message)s')
@@ -128,9 +128,16 @@ def check(routes=None, store=None, client=None, request_limit=None):
                     event("alert_limit", route=route.id)
                     break
                 try:
-                    message_id = send_alert(format_alert(fare, reasons, stats))
+                    body = format_alert(fare, reasons, stats)
+                    message_id = send_alert(body)
                     store.record_alert(fare, reasons, "sent", message_id)
                     event("alert_sent", route=route.id, price=fare.price, reasons=reasons)
+                    if os.getenv("TELEGRAM_DEALS_CHANNEL_ID"):
+                        try:
+                            send_channel_alert(body)
+                            event("channel_alert_sent", route=route.id)
+                        except Exception as exc:
+                            event("channel_alert_error", route=route.id, error=type(exc).__name__)
                 except Exception as exc:
                     store.record_alert(fare, reasons, "failed")
                     event("alert_error", route=route.id, error=type(exc).__name__)
@@ -194,7 +201,7 @@ def demo():
 
 def main():
     parser = argparse.ArgumentParser(description="Flight Deal Tracker")
-    parser.add_argument("command", choices=["check", "scheduled", "test-alert", "telegram-chat-id", "demo"])
+    parser.add_argument("command", choices=["check", "scheduled", "test-alert", "test-channel", "telegram-chat-id", "demo"])
     args = parser.parse_args()
     if args.command == "check":
         check()
@@ -203,6 +210,9 @@ def main():
     elif args.command == "test-alert":
         message_id = send_alert("Flight Deal Tracker test alert. Notifications are working.")
         print(f"Test alert accepted by Telegram: {message_id}")
+    elif args.command == "test-channel":
+        message_id = send_channel_alert("Flight Deal Tracker channel test. Future deal alerts will appear here.")
+        print(f"Channel test accepted by Telegram: {message_id}")
     elif args.command == "telegram-chat-id":
         print("Chat IDs:", ", ".join(telegram_chat_ids()) or "none; send /start to your bot first")
     else:

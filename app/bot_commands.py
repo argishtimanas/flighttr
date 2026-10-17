@@ -2,18 +2,20 @@
 from __future__ import annotations
 
 import os
+import re
 import shlex
 from datetime import date
 from pathlib import Path
+from urllib.parse import urlparse
 
 import yaml
 
 from app.config import load_routes, route_from_dict
-from app.notifications import send_alert, telegram_updates
+from app.notifications import send_alert, send_message, telegram_updates
 
 HELP = ("Commands:\n"
         "/add ID ORIGIN DEST YYYY-MM-DD [RETURN-YYYY-MM-DD]\n"
-        "/list\n/remove ID\n/check [ID|all]\n/help\n"
+        "/list\n/remove ID\n/check [ID|all]\n/channel-id PRIVATE-POST-LINK\n/help\n"
         "A route added without a return date is one-way. Alerts use price drops and history; no target price is required."
         " Commands are read on the next scheduled run.")
 
@@ -43,6 +45,15 @@ def handle_command(message: str, path: Path):
     routes = load_routes(path)
     if command in ("/start", "/help"):
         return HELP, []
+    if command == "/channel-id":
+        if len(args) != 2:
+            return "Usage: /channel-id https://t.me/c/CHANNEL/POST", []
+        url = urlparse(args[1])
+        match = re.fullmatch(r"/c/(\d+)/(\d+)", url.path)
+        if url.scheme != "https" or url.netloc not in {"t.me", "telegram.me"} or not match:
+            return "Send a private channel post link like https://t.me/c/CHANNEL/POST.", []
+        channel_id = -(1_000_000_000_000 + int(match.group(1)))
+        return f"Channel ID: {channel_id}\nSet it as the TELEGRAM_DEALS_CHANNEL_ID Actions secret.", []
     if command == "/list":
         if len(args) != 1:
             return "Usage: /list", []
@@ -91,16 +102,25 @@ def handle_command(message: str, path: Path):
     return HELP, []
 
 
-def process_updates(store, path: str | Path | None = None, *, session=None, send=send_alert):
+def process_updates(store, path: str | Path | None = None, *, session=None, send=send_alert,
+                    send_guest=send_message):
     path = Path(path or os.getenv("ROUTES_FILE", "data/routes.yaml"))
     chat_id = os.environ["TELEGRAM_CHAT_ID"]
     requested = []
     for update in telegram_updates(store.bot_offset(), session=session):
         update_id = update["update_id"]
         message = update.get("message") or {}
-        if str(message.get("chat", {}).get("id")) == chat_id and isinstance(message.get("text"), str):
-            reply, ids = handle_command(message["text"], path)
-            send(reply)
-            requested.extend(ids)
+        source_chat = message.get("chat", {})
+        if str(source_chat.get("id")) == chat_id:
+            forwarded = (message.get("forward_origin") or {}).get("chat") or message.get("forward_from_chat") or {}
+            if forwarded.get("type") == "channel" and forwarded.get("id"):
+                send(f"Channel ID: {forwarded['id']}\nSet it as the TELEGRAM_DEALS_CHANNEL_ID Actions secret.")
+            elif isinstance(message.get("text"), str):
+                reply, ids = handle_command(message["text"], path)
+                send(reply)
+                requested.extend(ids)
+        elif source_chat.get("type") == "private" and str(message.get("text", "")).split("@", 1)[0] == "/start":
+            send_guest("Deal alerts are in a private channel. Ask the owner for an invite. Route commands are owner-only.",
+                       source_chat["id"])
         store.save_bot_offset(update_id + 1)
     return list(dict.fromkeys(requested))
