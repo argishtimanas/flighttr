@@ -1,0 +1,18 @@
+routes:
+  - id: sfo-oak
+    enabled: true # Set true after changing dates and adding credentials
+    origin: SFO
+    destination: OAK
+    trip_type: round_trip
+    departure_start: 2026-12-19
+    departure_end: 2026-12-19
+    return_start: 2027-01-18
+    return_end: 2027-01-18
+    cabin: economy
+    adults: 1
+    currency: USD
+    max_price: 300
+    preferred_airlines: [] # IATA codes, e.g. [DL, UA]
+    max_stops: 0 # 0 nonstop; 1 or 2 also supported; null means any
+    max_duration_minutes: null
+    alerts_enabled: true

@@ -1,0 +1,8 @@
+{
+  "best_flights": [
+    {"flights": [{"departure_airport": {"id": "SFO", "time": "2027-02-12 08:00"}, "arrival_airport": {"id": "JFK", "time": "2027-02-12 16:30"}, "duration": 330, "airline": "Example Air", "flight_number": "EA 123"}], "total_duration": 330, "price": 218, "type": "One way", "booking_token": "example-only"}
+  ],
+  "other_flights": [
+    {"flights": [{"departure_airport": {"id": "SFO", "time": "2027-02-12 09:00"}, "arrival_airport": {"id": "JFK", "time": "2027-02-12 17:40"}, "duration": 340, "airline": "Example Air", "flight_number": "EA 456"}], "total_duration": 340, "price": 245, "type": "One way"}
+  ]
+}

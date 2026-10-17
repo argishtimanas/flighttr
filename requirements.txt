@@ -1,0 +1,9 @@
+requests>=2.31,<3
+PyYAML>=6,<7
+python-dotenv>=1,<2
+SQLAlchemy>=2,<3
+psycopg[binary]>=3,<4
+streamlit>=1.38,<2
+pandas>=2,<3
+plotly>=5,<7
+pytest>=8,<9
