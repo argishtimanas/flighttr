@@ -23,7 +23,20 @@ jobs:
       MAX_OUTBOUND_OPTIONS: 2
       DAILY_ALERT_LIMIT: 5
       TARGET_REF: ${{ github.ref_name }}
+      REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
     steps:
+      - name: Verify private repository and credentials
+        run: |
+          if [ "$REPOSITORY_PRIVATE" != "true" ]; then
+            echo "Flight history requires a private repository."
+            exit 1
+          fi
+          for name in SERPAPI_API_KEY TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID; do
+            if [ -z "${!name}" ]; then
+              echo "Missing required Actions secret: $name"
+              exit 1
+            fi
+          done
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref_name }}

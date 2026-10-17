@@ -1,8 +1,8 @@
 routes:
-  - id: sfo-oak
+  - id: sfo-bur
     enabled: true # Set true after changing dates and adding credentials
     origin: SFO
-    destination: OAK
+    destination: BUR
     trip_type: round_trip
     departure_start: 2026-12-19
     departure_end: 2026-12-19

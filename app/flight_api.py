@@ -101,7 +101,10 @@ class FlightClient:
                 except ValueError as exc:
                     raise FlightAPIError("SerpApi returned invalid JSON") from exc
                 if data.get("error"):
-                    raise FlightAPIError(str(data["error"]).replace(self.api_key, "[redacted]"))
+                    error = str(data["error"])
+                    if "hasn't returned any results for this query" in error:
+                        return {}
+                    raise FlightAPIError(error.replace(self.api_key, "[redacted]"))
                 return data
             except (requests.Timeout, requests.ConnectionError, requests.HTTPError) as exc:
                 if attempt == 2 or (isinstance(exc, requests.HTTPError) and response.status_code not in (429, 500, 502, 503, 504)):

@@ -17,7 +17,7 @@ python -m app.main demo
 pytest -q
 ```
 
-The demo uses `data/sample_flights.json` and makes no network call. Obtain a [free SerpApi key](https://serpapi.com/) and put it in `.env` as `SERPAPI_API_KEY`. Change the dates and route in `data/routes.yaml`, set `enabled: true`, and run `python -m app.main check`. Launch the dashboard with `streamlit run dashboard/dashboard.py`; it can add, edit, and remove routes and trigger checks.
+The demo uses `data/sample_flights.json` and makes no network call. Obtain a [free SerpApi key](https://serpapi.com/) and put it in `.env` as `SERPAPI_API_KEY`. Review the existing active route in `data/routes.yaml` and run `python -m app.main check`. Launch the dashboard with `streamlit run dashboard/dashboard.py`; it can add, edit, and remove routes and trigger checks. An airport pair may return no flights; the tracker records that as an empty check and keeps the route unchanged.
 
 ## Free Telegram notifications
 
@@ -39,10 +39,10 @@ An alert qualifies when the current cheapest fare for a date pair meets a target
 
 ## Free scheduled deployment
 
-1. Create a **private GitHub repository** containing this project's files. Keep `.github/workflows/flight_tracker.yml` at the repository root.
+1. Create a **private GitHub repository** containing this project's files. Keep `.github/workflows/flight_tracker.yml` at the repository root. The workflow stops before any API search if GitHub does not identify the repository as private.
 2. Add repository Actions secrets `SERPAPI_API_KEY`, `TELEGRAM_BOT_TOKEN`, and `TELEGRAM_CHAT_ID`.
 3. Configure your route in `data/routes.yaml`, set `enabled: true`, and push it.
-4. Run the **Flight deal check** workflow manually once, then inspect its log and the committed `data/tracker.db` file. The workflow runs at `0 */12 * * *` UTC; edit the cron line to change frequency.
+4. Run the **Flight deal check** workflow manually once, then inspect its log and the committed `data/tracker.db` file. The workflow requires all three secrets before it searches. It runs at `0 */12 * * *` UTC; edit the cron line to change frequency.
 
 The workflow requests `contents: write` so it can commit the SQLite database back to the private repository after each run. This is the persistent store for scheduled checks. If branch protection blocks the workflow's push, allow the workflow to write to that branch or use a separate writable private branch. SQLite files contain route and fare history, so keep the repository private. The local `.gitignore` excludes the database by default; the workflow deliberately force-adds only `data/tracker.db`. Scheduled runs are serialized through GitHub Actions concurrency and the app's file lock. For local cron, schedule `cd /path/to/flight-deal-tracker && /path/to/.venv/bin/python -m app.main check`.
 

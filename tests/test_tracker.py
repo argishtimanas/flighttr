@@ -85,6 +85,16 @@ def test_api_retry_and_missing():
         client.search(r, date(2027, 2, 12), None, lambda: False)
 
 
+def test_serpapi_no_results_is_empty():
+    session = Mock()
+    session.get.return_value.status_code = 200
+    session.get.return_value.json.return_value = {
+        "error": "Google Flights hasn't returned any results for this query."
+    }
+    client = FlightClient("fake", session=session)
+    assert client.search(route(), date(2027, 2, 12), None, lambda: True) == []
+
+
 def test_telegram_mock(monkeypatch):
     for key, value in {"TELEGRAM_BOT_TOKEN": "fake-token", "TELEGRAM_CHAT_ID": "12345"}.items():
         monkeypatch.setenv(key, value)
