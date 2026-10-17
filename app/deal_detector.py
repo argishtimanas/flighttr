@@ -28,7 +28,7 @@ def detect(fare, route, history, *, min_observations=5, unusual_discount=25, dro
         reasons.append("price threshold")
     if m["last_price"] is not None and m["drop_percent"] >= drop_threshold:
         reasons.append("price drop")
-    if m["historical_low"] is not None and fare.price < m["historical_low"]:
+    if m["historical_low"] is not None and percent_drop(m["historical_low"], fare.price) >= 10:
         reasons.append("historical low")
     if m["observations"] >= min_observations and percent_drop(m["median"], fare.price) >= unusual_discount:
         reasons.append("exceptional deal")

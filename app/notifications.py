@@ -18,10 +18,13 @@ def send_alert(body, session=None):
     """Send a free Telegram bot message to the configured chat."""
     token = os.environ["TELEGRAM_BOT_TOKEN"]
     chat_id = os.environ["TELEGRAM_CHAT_ID"]
-    response = (session or requests).post(
-        f"https://api.telegram.org/bot{token}/sendMessage",
-        data={"chat_id": chat_id, "text": body}, timeout=15)
-    response.raise_for_status()
+    try:
+        response = (session or requests).post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            data={"chat_id": chat_id, "text": body}, timeout=15)
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        raise RuntimeError("Telegram message request failed") from None
     result = response.json()
     if not result.get("ok"):
         raise RuntimeError("Telegram rejected the alert")
@@ -31,10 +34,28 @@ def send_alert(body, session=None):
 def telegram_chat_ids(session=None):
     """List chat IDs for users who have already started the bot."""
     token = os.environ["TELEGRAM_BOT_TOKEN"]
-    response = (session or requests).get(
-        f"https://api.telegram.org/bot{token}/getUpdates", timeout=15)
-    response.raise_for_status()
+    try:
+        response = (session or requests).get(
+            f"https://api.telegram.org/bot{token}/getUpdates", timeout=15)
+        response.raise_for_status()
+    except requests.RequestException:
+        raise RuntimeError("Telegram update request failed") from None
     result = response.json()
     if not result.get("ok"):
         raise RuntimeError("Telegram did not return updates")
     return sorted({str(update["message"]["chat"]["id"]) for update in result.get("result", []) if "message" in update})
+
+
+def telegram_updates(offset, session=None):
+    token = os.environ["TELEGRAM_BOT_TOKEN"]
+    try:
+        response = (session or requests).get(
+            f"https://api.telegram.org/bot{token}/getUpdates",
+            params={"offset": offset, "limit": 100, "timeout": 0, "allowed_updates": '["message"]'}, timeout=15)
+        response.raise_for_status()
+    except requests.RequestException:
+        raise RuntimeError("Telegram update request failed") from None
+    result = response.json()
+    if not result.get("ok"):
+        raise RuntimeError("Telegram rejected update request")
+    return result.get("result", [])

@@ -120,7 +120,7 @@ class FlightClient:
         # Initial round-trip results show outbound legs. Select a departure_token
         # to get actual return choices and prices for a complete itinerary.
         outbound_items = (data.get("best_flights") or []) + (data.get("other_flights") or [])
-        outbound_limit = int(os.getenv("MAX_OUTBOUND_OPTIONS", "2"))
+        outbound_limit = int(os.getenv("MAX_OUTBOUND_OPTIONS", "1"))
         if outbound_limit < 1:
             raise ValueError("MAX_OUTBOUND_OPTIONS must be positive")
         outbound_items = sorted(outbound_items, key=lambda x: x.get("price", float("inf")))[:outbound_limit]

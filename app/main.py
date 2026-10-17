@@ -7,7 +7,7 @@ import logging
 import os
 import uuid
 from contextlib import contextmanager
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from sqlalchemy import text
@@ -17,6 +17,7 @@ from app.database import Store
 from app.deal_detector import detect, should_notify
 from app.flight_api import FlightClient, FlightAPIError, normalize_results
 from app.notifications import format_alert, send_alert, telegram_chat_ids
+from app.bot_commands import process_updates
 
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 log = logging.getLogger(__name__)
@@ -54,7 +55,7 @@ def run_lock(store):
                 fcntl.flock(handle, fcntl.LOCK_UN)
 
 
-def check(routes=None, store=None, client=None):
+def check(routes=None, store=None, client=None, request_limit=None):
     routes = routes if routes is not None else load_routes()
     store = store or Store()
     if not any(route.enabled for route in routes):
@@ -64,6 +65,8 @@ def check(routes=None, store=None, client=None):
     daily_limit = positive_env("DAILY_API_LIMIT", 100)
     monthly_limit = positive_env("MONTHLY_API_LIMIT", 200)
     run_limit = positive_env("MAX_REQUESTS_PER_RUN", 20)
+    if request_limit is not None:
+        run_limit = min(run_limit, request_limit)
     alert_limit = positive_env("DAILY_ALERT_LIMIT", 5)
     cooldown = positive_env("ALERT_COOLDOWN_HOURS", 24)
     min_history = positive_env("MIN_HISTORY_OBSERVATIONS", 5)
@@ -139,6 +142,47 @@ def check(routes=None, store=None, client=None):
     return summary
 
 
+def scheduled():
+    """Poll commands hourly and spread automatic searches across the free month."""
+    store = Store()
+    requested = process_updates(store)
+    routes = load_routes()
+    if requested:
+        selected = [r for r in routes if r.enabled and r.id in requested]
+        if store.usage_month() >= positive_env("MONTHLY_API_LIMIT", 200):
+            send_alert("Monthly flight-search cap reached. Checks resume next UTC month.")
+            return
+        before = store.usage_today()
+        summary = check(routes=selected, store=store)
+        lines = [f"{item['route']}: " + (f"{item['cheapest']:.0f} cheapest" if item['results'] else "no fares found")
+                 for item in summary]
+        send_alert("Check complete (" + str(store.usage_today() - before) + " API requests).\n" + "\n".join(lines))
+        return
+
+    # Six requests per UTC day is at most 186 in a 31-day month. The monthly
+    # app cap remains 200, leaving some room for manual bot checks.
+    now = datetime.now(timezone.utc)
+    allowance = 6 * (now.hour + 1) // 24
+    remaining = max(0, allowance - store.usage_today())
+    if remaining == 0:
+        event("scheduled_wait", reason="daily pacing")
+        return
+    max_outbound = positive_env("MAX_OUTBOUND_OPTIONS", 1)
+    eligible = []
+    for route in routes:
+        if not route.enabled:
+            continue
+        dates = [(outbound, inbound) for outbound, inbound in route.combinations() if outbound >= now.date()]
+        estimated = len(dates) * (1 + (max_outbound if route.trip_type == "round_trip" else 0))
+        if dates and estimated <= remaining:
+            eligible.append(route)
+    if not eligible:
+        event("scheduled_wait", reason="insufficient paced credits or no current routes")
+        return
+    selected = min(eligible, key=lambda route: store.last_checked(route.id) or datetime.min)
+    check(routes=[selected], store=store, request_limit=remaining)
+
+
 def demo():
     from app.config import route_from_dict
     route = route_from_dict({"id": "demo-sfo-jfk", "origin": "SFO", "destination": "JFK", "trip_type": "one_way",
@@ -150,10 +194,12 @@ def demo():
 
 def main():
     parser = argparse.ArgumentParser(description="Flight Deal Tracker")
-    parser.add_argument("command", choices=["check", "test-alert", "telegram-chat-id", "demo"])
+    parser.add_argument("command", choices=["check", "scheduled", "test-alert", "telegram-chat-id", "demo"])
     args = parser.parse_args()
     if args.command == "check":
         check()
+    elif args.command == "scheduled":
+        scheduled()
     elif args.command == "test-alert":
         message_id = send_alert("Flight Deal Tracker test alert. Notifications are working.")
         print(f"Test alert accepted by Telegram: {message_id}")

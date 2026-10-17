@@ -32,6 +32,8 @@ checks = Table("checks", metadata,
     Column("id", Integer, primary_key=True), Column("route_id", String(64)),
     Column("checked_at", DateTime(timezone=True)), Column("status", String(16)),
     Column("result_count", Integer), Column("error", Text))
+bot_state = Table("bot_state", metadata,
+    Column("key", String(64), primary_key=True), Column("value", String(256), nullable=False))
 
 
 class Store:
@@ -78,6 +80,23 @@ class Store:
     def usage_month(self):
         with self.engine.connect() as conn:
             return conn.execute(select(monthly_usage.c.count).where(monthly_usage.c.month == datetime.now(timezone.utc).strftime("%Y-%m"))).scalar() or 0
+
+    def bot_offset(self):
+        with self.engine.connect() as conn:
+            return int(conn.execute(select(bot_state.c.value).where(bot_state.c.key == "telegram_offset")).scalar() or 0)
+
+    def save_bot_offset(self, offset):
+        with self.engine.begin() as conn:
+            if self.engine.dialect.name == "sqlite":
+                conn.exec_driver_sql("INSERT INTO bot_state(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                                     ("telegram_offset", str(offset)))
+            else:
+                conn.execute(text("INSERT INTO bot_state(key,value) VALUES (:key,:value) ON CONFLICT(key) DO UPDATE SET value=excluded.value"),
+                             {"key": "telegram_offset", "value": str(offset)})
+
+    def last_checked(self, route_id):
+        with self.engine.connect() as conn:
+            return conn.execute(select(func.max(checks.c.checked_at)).where(checks.c.route_id == route_id)).scalar()
 
     def save_fares(self, fares, check_id):
         now = datetime.now(timezone.utc)

@@ -58,6 +58,17 @@ def test_history_and_rules(tmp_path):
     assert store.usage_today() == 1
 
 
+def test_deal_without_target_uses_history():
+    r = route(max_price=None)
+    fare = normalize_results(payload(280), r, date(2027, 2, 12), None)[0]
+    now = datetime.now(timezone.utc)
+    history = [{"price": 350, "checked_at": now - timedelta(days=2)},
+               {"price": 340, "checked_at": now - timedelta(days=1)}]
+    reasons, _ = detect(fare, r, history)
+    assert "price drop" in reasons and "historical low" in reasons
+    assert detect(fare, r, [])[0] == []
+
+
 def test_deduplication():
     previous = {"price": 220, "created_at": datetime.now(timezone.utc) - timedelta(days=2)}
     assert not should_notify(previous, 220)
