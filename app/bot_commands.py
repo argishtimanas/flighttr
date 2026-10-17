@@ -15,7 +15,7 @@ from app.notifications import send_alert, send_message, telegram_updates
 
 HELP = ("Commands:\n"
         "/add ID ORIGIN DEST YYYY-MM-DD [RETURN-YYYY-MM-DD]\n"
-        "/list\n/remove ID\n/check [ID|all]\n/channel-id PRIVATE-POST-LINK\n/help\n"
+        "/list\n/remove ID\n/check [ID|all]\n/channel_id PRIVATE-POST-LINK\n/help\n"
         "A route added without a return date is one-way. Alerts use price drops and history; no target price is required."
         " Commands are read on the next scheduled run.")
 
@@ -45,9 +45,9 @@ def handle_command(message: str, path: Path):
     routes = load_routes(path)
     if command in ("/start", "/help"):
         return HELP, []
-    if command == "/channel-id":
+    if command in ("/channel_id", "/channel-id"):
         if len(args) != 2:
-            return "Usage: /channel-id https://t.me/c/CHANNEL/POST", []
+            return "Usage: /channel_id https://t.me/c/CHANNEL/POST", []
         url = urlparse(args[1])
         match = re.fullmatch(r"/c/(\d+)/(\d+)", url.path)
         if url.scheme != "https" or url.netloc not in {"t.me", "telegram.me"} or not match:

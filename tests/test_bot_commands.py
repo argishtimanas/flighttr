@@ -27,9 +27,9 @@ def test_add_list_remove_routes_without_target(tmp_path):
 def test_private_channel_link_is_owner_setup_only(tmp_path):
     path = tmp_path / "routes.yaml"
     path.write_text(yaml.safe_dump({"routes": []}))
-    reply, requested = handle_command("/channel-id https://t.me/c/1234567890/42", path)
+    reply, requested = handle_command("/channel_id https://t.me/c/1234567890/42", path)
     assert "-1001234567890" in reply and requested == []
-    assert "Send a private channel post link" in handle_command("/channel-id https://example.com/c/123/42", path)[0]
+    assert "Send a private channel post link" in handle_command("/channel_id https://example.com/c/123/42", path)[0]
 
 
 def test_only_configured_chat_can_change_routes(tmp_path, monkeypatch):
